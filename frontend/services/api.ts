@@ -1,6 +1,8 @@
 import type { CompanyInsights, CompareResponse, SalaryListResponse, Stats } from "@/types/salary";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://compensation-intelligence-backend.onrender.com";
 
 async function request<T>(path: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
