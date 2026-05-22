@@ -1,6 +1,6 @@
 import type { CompanyInsights, CompareResponse, SalaryListResponse, Stats } from "@/types/salary";
 
-const API_URL =
+const API_BASE_URL=
   process.env.NEXT_PUBLIC_API_URL ||
   "https://compensation-intelligence-backend.onrender.com";
 
