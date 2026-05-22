@@ -1,0 +1,24 @@
+{
+  "name": "compensation-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Structured compensation intelligence system focused on comparable level-based compensation data.",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "test": "npm run test -w backend",
+    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
