@@ -22,16 +22,12 @@ export default function HomePage() {
       <section className="border-b bg-secondary/50">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="space-y-6">
-            <div className="inline-flex rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-foreground">
-              Structured → Queryable → Comparable → Decision-ready
-            </div>
+            
             <div className="space-y-4">
               <h1 className="max-w-3xl text-4xl font-bold leading-tight md:text-6xl">
                 Compensation intelligence by level, not noisy job titles.
               </h1>
-              <p className="max-w-2xl text-lg text-muted-foreground">
-                Normalize salary records, compare L3/L4/L5 bands, and make compensation decisions with confidence-weighted data.
-              </p>
+              
             </div>
             <div className="flex max-w-2xl flex-col gap-3 sm:flex-row">
               <Input placeholder="Search company, e.g. google" value={company} onChange={(event) => setCompany(event.target.value)} />
