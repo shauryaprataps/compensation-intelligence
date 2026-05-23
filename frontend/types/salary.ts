@@ -73,3 +73,17 @@ export type CompareResponse = {
   company_comparison: string;
   experience_comparison: number;
 };
+
+export type SubmitSalaryInput = {
+  company: string;
+  role: string;
+  level_standardized: string;
+  location: string;
+  experience_years: number;
+  base_salary: number;
+  bonus?: number;
+  stock?: number;
+  total_compensation: number;
+  confidence_score: number;
+};
+

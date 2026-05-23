@@ -4,10 +4,12 @@ const API_BASE_URL=
   process.env.NEXT_PUBLIC_API_URL ||
   "https://compensation-intelligence-backend.onrender.com";
 
-async function request<T>(path: string) {
+async function request<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {})
     },
     cache: "no-store"
   });
@@ -42,11 +44,27 @@ export function getCompanies() {
   return request<CompaniesListResponse>("/companies");
 }
 
-
 export function getCompany(company: string) {
-  return request<{ success: true; data: CompanyInsights }>(`/company/${encodeURIComponent(company)}`);
+  return request<{ success: true; data: CompanyInsights }>(
+    `/company/${encodeURIComponent(company)}`
+  );
 }
 
 export function getComparison(id1: string, id2: string) {
-  return request<{ success: true; data: CompareResponse }>(`/compare?id1=${encodeURIComponent(id1)}&id2=${encodeURIComponent(id2)}`);
+  return request<{ success: true; data: CompareResponse }>(
+    `/compare?id1=${encodeURIComponent(id1)}&id2=${encodeURIComponent(id2)}`
+  );
 }
+
+export type SubmitSalaryApiResponse = {
+  success: boolean;
+  data: any;
+};
+
+export async function submitSalary(payload: any): Promise<SubmitSalaryApiResponse> {
+  return request<SubmitSalaryApiResponse>("/ingest-salary", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
