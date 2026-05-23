@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 const links = [
   { href: "/salaries", label: "Salaries" },
   { href: "/companies", label: "Companies" },
-  { href: "/compare", label: "Compare" }
+  { href: "/compare", label: "Compare" },
+  { href: "/submit", label: "Submit Salary"}
 ];
 
 export function Nav() {
