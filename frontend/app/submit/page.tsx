@@ -168,8 +168,6 @@ export default function SubmitSalaryPage() {
     try {
       const payload: SubmitSalaryInput = {
         ...normalized,
-        total_compensation: normalized.base_salary + normalized.bonus + normalized.stock,
-        // created_at is optional for schema purposes; omit unless backend requires it.
         confidence_score: 80
       } as any;
 
