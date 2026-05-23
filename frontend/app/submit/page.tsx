@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Plus } from "lucide-react";
 
@@ -9,14 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-import { submitSalary } from "@/services/api";
+import { getAllLocations, submitSalary } from "@/services/api";
 import type { SubmitSalaryInput } from "@/types/salary";
+
+import { normalizeLocation } from "@/utils/normalizeLocation";
 
 
 const COMPANY_PRESETS = ["Google", "Microsoft", "Amazon", "Meta", "Apple", "Netflix", "Nvidia", "OpenAI"];
 const ROLE_PRESETS = ["Software Engineer", "Data Scientist", "Product Manager", "Engineering Manager", "Design"];
 const LEVEL_PRESETS = ["L3", "L4", "L5", "L6", "L7", "L8"];
-const LOCATION_PRESETS = ["Bengaluru", "Bengaluru (Bangalore)", "Hyderabad", "Mumbai", "Delhi", "Gurugram", "Remote"];
+
 
 const CURRENCY_PRESETS = [
   { label: "INR (₹)", value: "INR" },
@@ -39,7 +43,13 @@ export default function SubmitSalaryPage() {
 
   const [role, setRole] = useState<string>(ROLE_PRESETS[0]);
   const [level, setLevel] = useState<string>(LEVEL_PRESETS[2]);
-  const [location, setLocation] = useState<string>(LOCATION_PRESETS[0]);
+
+  const [locationInput, setLocationInput] = useState<string>("");
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [knownLocations, setKnownLocations] = useState<string[]>([]);
+
 
   const [experienceYears, setExperienceYears] = useState<number>(3);
 
@@ -59,14 +69,15 @@ export default function SubmitSalaryPage() {
       company: companyMode === "preset" ? companyPreset : companyCustom.trim(),
       role,
       level_standardized: level,
-      location,
+      location: normalizeLocation(locationInput),
       experience_years: clampNonNegativeInt(experienceYears),
       base_salary: clampNonNegativeInt(base),
       bonus: clampNonNegativeInt(b),
       stock: clampNonNegativeInt(s),
       confidence_score: 80
     };
-  }, [bonus, baseSalary, companyCustom, companyMode, companyPreset, experienceYears, level, location, role, stock]);
+  }, [bonus, baseSalary, companyCustom, companyMode, companyPreset, experienceYears, level, locationInput, role, stock]);
+
 
   const estimatedTotalTc = useMemo(() => {
     const total = normalized.base_salary + normalized.bonus + normalized.stock;
@@ -80,6 +91,7 @@ export default function SubmitSalaryPage() {
     if (!normalized.role) next.role = "Role is required";
     if (!normalized.level_standardized) next.level = "Level is required";
     if (!normalized.location) next.location = "Location is required";
+
 
     if (!Number.isFinite(experienceYears) || Number.isNaN(experienceYears)) {
       next.experience_years = "Years of experience is required";
@@ -97,7 +109,54 @@ export default function SubmitSalaryPage() {
     return next;
   }
 
+  useEffect(() => {
+    let mounted = true;
+    setLocationLoading(true);
+    setLocationError(null);
+
+    getAllLocations()
+      .then((locs) => {
+        if (!mounted) return;
+        setKnownLocations(locs);
+        setLocationSuggestions([]);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setLocationError((err as Error).message);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLocationLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function updateLocationSuggestions(nextValue: string) {
+    const q = nextValue.trim().toLowerCase();
+    if (!q) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    const aliasNormalized = normalizeLocation(nextValue);
+
+    const matches = knownLocations
+      .filter((loc) => {
+        const normalizedLoc = normalizeLocation(loc).toLowerCase();
+        return normalizedLoc.includes(q) || normalizedLoc.includes(aliasNormalized.toLowerCase());
+      })
+      .map((loc) => normalizeLocation(loc));
+
+    // De-dupe while preserving order
+    const uniq = Array.from(new Set(matches));
+    setLocationSuggestions(uniq.slice(0, 8));
+  }
+
   async function onSubmit(e: React.FormEvent) {
+
     e.preventDefault();
     if (submitting) return;
 
@@ -252,14 +311,44 @@ export default function SubmitSalaryPage() {
                 <div>
                   <label className="text-sm font-medium">Location</label>
                   <div className="mt-2">
-                    <Select
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      options={LOCATION_PRESETS.map((loc) => ({ label: loc, value: loc }))}
+                    <Input
+                      placeholder="Enter city (e.g. Bengaluru)"
+                      value={locationInput}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setLocationInput(v);
+                        updateLocationSuggestions(v);
+                      }}
                     />
+
+                    {locationLoading && (
+                      <div className="mt-1 text-xs text-muted-foreground">Loading locations…</div>
+                    )}
+                    {locationError && (
+                      <div className="mt-1 text-xs text-destructive">{locationError}</div>
+                    )}
+
+                    {locationSuggestions.length > 0 && (
+                      <div className="mt-2 rounded-md border bg-background shadow-sm">
+                        {locationSuggestions.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setLocationInput(s);
+                              setLocationSuggestions([]);
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <FieldError name="location" />
                 </div>
+
 
                 <div>
                   <label className="text-sm font-medium">Years of experience</label>

@@ -68,3 +68,13 @@ export async function submitSalary(payload: any): Promise<SubmitSalaryApiRespons
   });
 }
 
+export async function getAllLocations(): Promise<string[]> {
+  // Fetch enough rows to get distinct locations.
+  // Backend paging is supported; we request a larger page size to reduce calls.
+  const params = new URLSearchParams({ page: "1", pageSize: "200", sort: "total_compensation", order: "desc" });
+  const res = await getSalaries(params);
+  const locations = (res.data ?? []).map((r: any) => r.location).filter(Boolean);
+  return Array.from(new Set(locations));
+}
+
+
