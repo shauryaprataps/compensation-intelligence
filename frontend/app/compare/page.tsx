@@ -2,15 +2,38 @@
 
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
 import { SalaryTable } from "@/components/salary-table";
 import { ErrorState, LoadingState, EmptyState } from "@/components/state-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useComparison, useSalaries } from "@/hooks/use-salaries";
-import { formatCurrency } from "@/utils/format";
+
+import { ComparisonCharts } from "@/components/ComparisonCharts";
+import { ComparisonTable } from "@/components/ComparisonTable";
+import { DecisionSnapshot } from "@/components/DecisionSnapshot";
+import { Initials } from "@/app/compare/ComparisonInitials";
+
+type SelectedRecord = {
+  id: string;
+  company: string;
+  role: string;
+  level_standardized: string;
+  location: string;
+  experience_years: number;
+  base_salary: number;
+  bonus: number;
+  stock: number;
+  total_compensation: number;
+  confidence_score: number;
+};
+
+function levelToNum(level: string) {
+  const n = Number(level.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
 
 export default function ComparePage() {
-
   const [selected, setSelected] = useState<string[]>([]);
   const [filters, setFilters] = useState({
     company: "",
@@ -32,138 +55,185 @@ export default function ComparePage() {
     return next;
   }, [filters]);
 
-
-
   const salaries = useSalaries(params);
   const comparison = useComparison(selected[0], selected[1]);
-
 
   function toggle(id: string) {
     setSelected((current) => {
       if (current.includes(id)) return current.filter((item) => item !== id);
-      // Enforce selecting exactly two records (A + B).
       return current.length >= 2 ? [current[1], id] : [...current, id];
     });
   }
 
+  const data = comparison.data?.data;
 
-  const chartData = comparison.data?.data
-    ? [
-        {
-          component: "Base",
-          A: comparison.data.data.record_a.base_salary,
-          B: comparison.data.data.record_b.base_salary
-        },
-        {
-          component: "Bonus",
-          A: comparison.data.data.record_a.bonus,
-          B: comparison.data.data.record_b.bonus
-        },
-        {
-          component: "Stock",
-          A: comparison.data.data.record_a.stock,
-          B: comparison.data.data.record_b.stock
-        },
-        {
-          component: "Total",
-          A: comparison.data.data.record_a.total_compensation,
-          B: comparison.data.data.record_b.total_compensation
-        }
-      ]
-    : [];
+  const recordA = data?.record_a as SelectedRecord | undefined;
+  const recordB = data?.record_b as SelectedRecord | undefined;
 
-  const recordACompany = comparison.data?.data?.record_a.company;
-  const recordBCompany = comparison.data?.data?.record_b.company;
+  const totalDifference = data?.difference.total ?? 0;
+  const percentageDifference = data?.difference.percentage ?? 0;
 
+  const levelDifference = recordB && recordA ? levelToNum(recordB.level_standardized) - levelToNum(recordA.level_standardized) : 0;
+
+  const totalWinner: "A" | "B" = recordA && recordB ? (recordA.total_compensation >= recordB.total_compensation ? "A" : "B") : "A";
+  const levelWinner: "A" | "B" = recordA && recordB ? (levelDifference >= 0 ? "B" : "A") : "A";
+  const moreStockWinner: "A" | "B" = recordA && recordB ? (recordA.stock >= recordB.stock ? "A" : "B") : "A";
+  const percentageWinner: "A" | "B" = totalWinner;
+
+  const recommendation = (() => {
+    if (!recordA || !recordB || !data) return "";
+
+    const winner = totalWinner === "A" ? recordA : recordB;
+    const loser = totalWinner === "A" ? recordB : recordA;
+
+    const winnerLevelDiff = levelDifference === 0 ? "" : `Higher level (${levelDifference > 0 ? `+${levelDifference}` : levelDifference})`;
+
+    const deltaAbs = Math.abs(data.difference.total);
+    const sign = data.difference.total >= 0 ? "+" : "-";
+
+    return `${winner.company} ${winner.level_standardized} pays ${sign}${deltaAbs >= 0 ? "" : ""}${data.difference.total >= 0 ? "more" : "less"} on total comp. ${winnerLevelDiff ? `Better level: ${winnerLevelDiff}.` : ""}`.trim();
+  })();
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
       <div>
-        <h1 className="text-3xl font-bold">Compare Salary Records</h1>
-        <p className="mt-2 text-muted-foreground">Filter salary records, then select exactly two to compare components and compensation deltas.</p>
+        <h1 className="text-3xl font-bold">Compare Salary</h1>
+        <p className="mt-2 text-muted-foreground">Select exactly two salary records to generate a Levels.fyi-style comparison.</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
+        <CardContent className="grid gap-3 md:grid-cols-5">
           <Input placeholder="Company" value={filters.company} onChange={(e) => setFilters((p) => ({ ...p, company: e.target.value }))} />
           <Input placeholder="Role" value={filters.role} onChange={(e) => setFilters((p) => ({ ...p, role: e.target.value }))} />
           <Input placeholder="Location" value={filters.location} onChange={(e) => setFilters((p) => ({ ...p, location: e.target.value }))} />
           <Input placeholder="Level, e.g. L4" value={filters.level} onChange={(e) => setFilters((p) => ({ ...p, level: e.target.value }))} />
           <Input placeholder="Experience (min years)" value={filters.experience} onChange={(e) => setFilters((p) => ({ ...p, experience: e.target.value }))} />
-
         </CardContent>
       </Card>
 
-      {salaries.isLoading ? <LoadingState /> : salaries.error ? <ErrorState message={(salaries.error as Error).message} /> : (
+      {salaries.isLoading ? (
+        <LoadingState />
+      ) : salaries.error ? (
+        <ErrorState message={(salaries.error as Error).message} />
+      ) : (
         <SalaryTable rows={salaries.data?.data ?? []} selectable selectedIds={selected} onToggle={toggle} />
       )}
 
+      {selected.length !== 2 ? (
+        <EmptyState message="Select exactly two salary records to generate a comparison" />
+      ) : comparison.isLoading ? (
+        <LoadingState label="Building comparison" />
+      ) : comparison.error ? (
+        <ErrorState message={(comparison.error as Error).message} />
+      ) : data && recordA && recordB ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StickyOfferCard
+              side="Left"
+              company={recordA.company}
+              role={recordA.role}
+              level={recordA.level_standardized}
+              location={recordA.location}
+              winner={totalWinner === "A"}
+            />
+            <StickyOfferCard
+              side="Right"
+              company={recordB.company}
+              role={recordB.role}
+              level={recordB.level_standardized}
+              location={recordB.location}
+              winner={totalWinner === "B"}
+            />
+          </div>
 
-      {selected.length !== 2 ? <EmptyState message="Select exactly two salary records to generate a comparison" /> : comparison.isLoading ? <LoadingState label="Building comparison" /> : comparison.error ? <ErrorState message={(comparison.error as Error).message} /> : comparison.data?.data ? (
+          <DecisionSnapshot
+            recordACompany={recordA.company}
+            recordBCompany={recordB.company}
+            recordA={{ total_compensation: recordA.total_compensation, level_standardized: recordA.level_standardized }}
+            recordB={{ total_compensation: recordB.total_compensation, level_standardized: recordB.level_standardized }}
+            differenceTotal={totalDifference}
+            percentageDifference={percentageDifference}
+            levelDifference={levelDifference}
+            recommendation={recommendation}
+            winner={totalWinner}
+          />
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Structured Comparison</CardTitle>
+          <ComparisonCharts
+            recordACompany={recordA.company}
+            recordBCompany={recordB.company}
+            recordA={recordA}
+            recordB={recordB}
+            percentageDifference={percentageDifference}
+          />
 
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Diff label="Base" value={comparison.data.data.difference.base} />
-              <Diff label="Bonus" value={comparison.data.data.difference.bonus} />
-              <Diff label="Stock" value={comparison.data.data.difference.stock} />
-              <Diff label="Total compensation" value={comparison.data.data.difference.total} />
-
-              <div className="rounded-md border p-3 text-sm">Level difference: {comparison.data.data.level_comparison}</div>
-              <div className="rounded-md border p-3 text-sm">Company difference: {comparison.data.data.company_comparison}</div>
-
-              <div className="rounded-md border p-3 text-sm">Percentage difference: <strong>{comparison.data.data.difference.percentage}%</strong></div>
-
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Component Comparison</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="component" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar
-
-                    dataKey="A"
-                    name={recordACompany}
-                    fill="#0f8f84"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="B"
-                    name={recordBCompany}
-                    fill="#f08a24"
-                    radius={[4, 4, 0, 0]}
-                  />
-
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <ComparisonTable
+            recordACompany={recordA.company}
+            recordBCompany={recordB.company}
+            recordA={recordA}
+            recordB={recordB}
+            levelDifference={levelDifference}
+            companyDifference={data.company_comparison}
+            percentageDifference={percentageDifference}
+            levelWinner={levelWinner}
+            totalWinner={totalWinner}
+            moreStockWinner={moreStockWinner}
+            percentageWinner={percentageWinner}
+          />
         </div>
       ) : null}
     </main>
   );
 }
 
-function Diff({ label, value }: { label: string; value: number }) {
+function StickyOfferCard({
+  side,
+  company,
+  role,
+  level,
+  location,
+  winner
+}: {
+  side: string;
+  company: string;
+  role: string;
+  level: string;
+  location: string;
+  winner: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-md border p-3 text-sm">
-      <span>{label}</span>
-      <span className={value >= 0 ? "font-semibold text-primary" : "font-semibold text-destructive"}>{formatCurrency(value)}</span>
-    </div>
+    <Card className="sticky top-4 overflow-hidden border-border/70">
+      <div className={`px-5 py-4 ${winner ? "bg-purple-600/10" : "bg-muted/20"}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Initials name={company} />
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="text-lg font-bold">{company}</div>
+                {winner ? (
+                  <span className="rounded-md bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white">✓ BEST</span>
+                ) : null}
+              </div>
+              <div className="text-sm text-muted-foreground">{role}</div>
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">{side}</div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-lg border bg-background/60 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Level</div>
+            <div className="mt-1 text-base font-semibold">{level}</div>
+          </div>
+          <div className="rounded-lg border bg-background/60 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Location</div>
+            <div className="mt-1 text-base font-semibold">{location}</div>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
+
