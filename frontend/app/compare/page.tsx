@@ -161,13 +161,8 @@ export default function ComparePage() {
             winner={totalWinner}
           />
 
-          <ComparisonCharts
-            recordACompany={recordA.company}
-            recordBCompany={recordB.company}
-            recordA={recordA}
-            recordB={recordB}
-            percentageDifference={percentageDifference}
-          />
+          <ComparisonCharts recordACompany={recordA.company} recordBCompany={recordB.company} recordA={recordA} recordB={recordB} />
+
 
           <ComparisonTable
             recordACompany={recordA.company}
